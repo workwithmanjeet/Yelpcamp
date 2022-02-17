@@ -1,3 +1,8 @@
+if (process.env.NODE_ENV!== "production"){
+    require('dotenv').config({ path:'./.gitignore/.env' });
+}
+
+
 const express = require('express');
 const app = express();
 const path = require('path');
@@ -14,10 +19,11 @@ const methodOverride = require('method-override')
 app.use(methodOverride('_method'))
 app.use(express.static( path.join(__dirname,'public')))
 
+const url = process.env.Dburl
 
-
+// mongodb://localhost:27017/yelp-camp
 const mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost:27017/yelp-camp',{
+mongoose.connect(url,{
    
 });
 
@@ -37,15 +43,23 @@ app.set('view engine','ejs');
 app.set('views', path.join(__dirname,'views'))
 
 const sessionConfig = {
+    name: 'sessionabs',
     secret: 'notagoodwayvvvvvvvvvvvvvvvvvvvvvv',
     resave: false,
     saveUninitialized: true,
     cookie:{
         httpOnly:true,
+        // secure: true,
         expires: Date.now()+ (1000*60*60*24*7 ),
         maxAge: 1000 * 60 * 60  * 24 * 7
     }
 }
+
+const mongoSanitize = require('express-mongo-sanitize');
+app.use(mongoSanitize({
+    replaceWith: '_'
+}))
+
 app.use(session(sessionConfig));
 app.use(flash());
 
@@ -67,19 +81,26 @@ app.use((req, res,next)=>{
 })
 
 
+app.get('/',(req, res)=>{
+    res.render('home.ejs')
+})
 
 app.use('/campground',campgroundsRoutes)
 app.use('/campground/:id/reviews',reviewsRoutes)
 app.use('/',usersRoutes)
 
 
-
-
-
-app.use((err,req,res,next)=>{
-    res.send(err.message)
+app.all('*', (req, res, next) => {
+    next(new ExpressError('Page Not Found', 404))
 })
 
-app.listen(3000,()=>{
-    console.log("ON port 3000")
+app.use((err, req, res, next) => {
+    const { statusCode = 500 } = err;
+    if (!err.message) err.message = 'Oh No, Something Went Wrong!'
+    res.status(statusCode).render('error', { err })
 })
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Our app is running on port ${ PORT }`);
+});
